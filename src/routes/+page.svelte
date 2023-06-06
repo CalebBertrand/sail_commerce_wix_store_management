@@ -1,13 +1,18 @@
 <script lang="ts">
-	import { ClickableTile, Button, Search, Modal } from "carbon-components-svelte";
+	import {
+		ClickableTile,
+		Button,
+		Search,
+		Modal,
+	} from "carbon-components-svelte";
 	import { getContext, onMount } from "svelte";
 	import { fade } from "svelte/transition";
-	import { TrashCan } from "carbon-icons-svelte";
+	import { ChevronRight, TrashCan } from "carbon-icons-svelte";
 	import { goto } from "$app/navigation";
 	import type { PageData } from "./$types";
 	import type { Writable } from "svelte/store";
 	import type { Product } from "$lib/product";
-  import type { AppState } from "$lib/stores";
+	import type { AppState } from "$lib/stores";
 
 	export let data: PageData;
 
@@ -36,16 +41,17 @@
 	);
 
 	function gotoProductDetail(product: Product): void {
-		appState.update(state => ({ ...state, selectedProduct: product }));
-		console.log($appState);
+		appState.update((state) => ({ ...state, selectedProduct: product }));
 		goto(`product/${product.guid}`);
 	}
 	function confirmDeleteProduct(product: Product): void {
-		appState.update(state => ({ ...state, selectedProduct: product }));
+		appState.update((state) => ({ ...state, selectedProduct: product }));
 		deleteModalShown = true;
 	}
 	function deleteSelectedProduct(): void {
-		data.products = data.products.filter(product => product.guid !== $appState.selectedProduct?.guid);
+		data.products = data.products.filter(
+			(product) => product.guid !== $appState.selectedProduct?.guid
+		);
 		deleteModalShown = false;
 	}
 </script>
@@ -68,8 +74,9 @@
 				<h4 class="float-left">{product.name}</h4>
 				<div class="float-right">
 					<Button
-						class="uppercase tracking-widest"
+						class="uppercase tracking-widest mr-1"
 						kind="primary"
+						icon={ChevronRight}
 						on:click={() => gotoProductDetail(product)}
 					>
 						Edit
@@ -88,17 +95,16 @@
 	{/each}
 {/if}
 
-
 <Modal
-  danger
-  bind:open={deleteModalShown}
-  modalHeading={`Delete ${$appState.selectedProduct?.name}`}
-  primaryButtonText="Delete"
-  secondaryButtonText="Cancel"
-  on:click:button--secondary={() => (deleteModalShown = false)}
-  on:open
-  on:close
-  on:submit={() => deleteSelectedProduct()}
+	danger
+	bind:open={deleteModalShown}
+	modalHeading={`Delete ${$appState.selectedProduct?.name}`}
+	primaryButtonText="Delete"
+	secondaryButtonText="Cancel"
+	on:click:button--secondary={() => (deleteModalShown = false)}
+	on:open
+	on:close
+	on:submit={() => deleteSelectedProduct()}
 >
-  <p>This is a permanent action and cannot be undone.</p>
+	<p>This is a permanent action and cannot be undone.</p>
 </Modal>

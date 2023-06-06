@@ -21,9 +21,64 @@ h4 {
 }
 
 h5 {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
 }
 
 h6 {
-    font-size: 1rem;
+    font-size: 1.25rem;
+}
+
+code {
+    color: theme('colors.white');
+    background-color: theme('colors.slate.600');
+    padding: 0.1rem 0.5rem;
+    border-radius: theme('borderRadius.DEFAULT');
+}
+
+.box-shadow {
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.18), 0 6px 20px 0 rgba(0, 0, 0, 0.12);
+}
+
+/** Carbon Variable Classes */
+.text-helper-color {
+    color: var(--cds-text-helper);
+}
+
+.text-primary-color {
+    color: var(--cds-text-primary);
+}
+
+.text-secondary-color {
+    color: var(--cds-text-secondary);
+}
+
+.bg-ui-background-color {
+    background-color: var(--cds-ui-background);
+}
+
+.bg-ui-01-color {
+    background-color: var(--cds-ui-01);
+    transition: background-color 0.25s;
+}
+
+.bg-ui-01-color.hoverable:hover {
+    background-color: var(--cds-hover-ui);
+}
+
+/** Carbon Style Overrides */
+
+span.bx--tooltip--definition,
+span.bx--tooltip--definition>button {
+    border: none !important;
+}
+
+/** .header-input is a custom class */
+input.bx--text-input.header-input {
+    font-size: 2rem;
+    transition: background-color 0.25s;
+    height: 3.75rem;
+}
+
+input.bx--text-input.header-input:not(:focus) {
+    background-color: transparent !important;
 }
