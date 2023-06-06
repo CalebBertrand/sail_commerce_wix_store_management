@@ -27,6 +27,7 @@ export type Product = {
     name: string;
     options: Array<ProductOption>;
     priceFormula: string;
+    appId: string;
 }
 
 export function isProductOptionSelect(option: ProductOption): option is SelectProductOption {

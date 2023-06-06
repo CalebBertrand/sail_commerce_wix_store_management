@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AppState } from "$lib/stores";
+	import { appStateFactory, type AppState } from "$lib/stores";
 	import {
 		Header,
 		Content,
@@ -9,9 +9,8 @@
 	} from "carbon-components-svelte";
 	import { Moon, Sun } from "carbon-icons-svelte";
 	import { setContext } from "svelte";
-	import { writable } from "svelte/store";
 
-	setContext("state", writable<AppState>({ selectedProduct: undefined }));
+	setContext("state", appStateFactory());
 
 	const darkMode = "g90";
 	const lightMode = "white";

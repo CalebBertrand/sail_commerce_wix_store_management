@@ -20,6 +20,7 @@
 		isProductOptionSelect,
 		isProductOptionNumber,
 		type SelectProductOption,
+		type ProductOption,
 	} from "$lib/product";
 	import Sortable from "sortablejs";
 
@@ -32,11 +33,11 @@
 	let confirmNoSaveModalShown = false;
 	let confirmedNoSave = false; // for if the user tries to navigate away with invalid data
 
-	function removeValueFromSelect(
-		option: SelectProductOption,
-		value: string
-	): void {
-		option.values = option.values.filter((v) => v !== value);
+	// Svelte doesn't yet support type guards :( so just have to be careful to only call this on options that are selects
+	function removeValueFromSelect(option: ProductOption, value: string): void {
+		(option as SelectProductOption).values = (
+			option as SelectProductOption
+		).values.filter((v) => v !== value);
 	}
 
 	function validateChanges(): Record<string, string> {
