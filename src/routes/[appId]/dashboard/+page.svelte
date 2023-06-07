@@ -7,7 +7,7 @@
 	} from "carbon-components-svelte";
 	import { getContext, onMount } from "svelte";
 	import { fade } from "svelte/transition";
-	import { ChevronRight, TrashCan } from "carbon-icons-svelte";
+	import { Add, ChevronRight, TrashCan } from "carbon-icons-svelte";
 	import { goto } from "$app/navigation";
 	import type { PageData } from "./$types";
 	import type { Writable } from "svelte/store";
@@ -40,9 +40,22 @@
 		caseInsensitiveContains(product.name, searchValue)
 	);
 
+	function gotoNewProductDetail() {
+		const newProduct: Product = {
+			appId: $appState.appId,
+			guid: crypto.randomUUID(),
+			name: "",
+			options: [],
+			priceFormula: "",
+		};
+
+		appState.update((state) => ({ ...state, selectedProduct: newProduct }));
+		goto(`dashboard/product/${newProduct.guid}`);
+		console.log($appState);
+	}
 	function gotoProductDetail(product: Product): void {
 		appState.update((state) => ({ ...state, selectedProduct: product }));
-		goto(`product/${product.guid}`);
+		goto(`dashboard/product/${product.guid}`);
 	}
 	function confirmDeleteProduct(product: Product): void {
 		appState.update((state) => ({ ...state, selectedProduct: product }));
@@ -59,7 +72,13 @@
 <div class="mb-6">
 	<h1 class="float-left mb-3 md:mb-0">Products</h1>
 
-	<div class="float-right w-full md:w-1/3">
+	<div class="float-right mx-1">
+		<Button kind="primary" on:click={() => gotoNewProductDetail()} icon={Add}
+			>Add Product</Button
+		>
+	</div>
+
+	<div class="float-right w-full md:w-1/3 mx-1">
 		<Search bind:value={searchValue} />
 	</div>
 

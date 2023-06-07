@@ -10,7 +10,7 @@
 	import { Moon, Sun } from "carbon-icons-svelte";
 	import { setContext } from "svelte";
 
-	setContext("state", appStateFactory());
+	setContext("state", appStateFactory("testId"));
 
 	const darkMode = "g90";
 	const lightMode = "white";
@@ -36,5 +36,5 @@
 </Content>
 
 <style>
-	@import "../app.css";
+	@import "../../../app.css";
 </style>

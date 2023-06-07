@@ -88,6 +88,8 @@
 			labelText="Product Name"
 			placeholder="Enter Product Name..."
 			size="xl"
+			invalid={!product.name}
+			invalidText="Required"
 			bind:value={product.name}
 		/>
 
@@ -215,7 +217,7 @@
 	<Modal
 		danger
 		bind:open={confirmNoSaveModalShown}
-		modalHeading={`You have invalid changes, do you want to leave?`}
+		modalHeading={`You have invalid changes, are you sure you want to leave? Your changes will not be saved.`}
 		primaryButtonText="Leave"
 		secondaryButtonText="Stay"
 		on:click:button--secondary={() => (confirmNoSaveModalShown = false)}

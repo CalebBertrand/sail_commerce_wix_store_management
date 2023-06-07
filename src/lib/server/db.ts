@@ -1,7 +1,12 @@
 import { DefaultAzureCredential } from "@azure/identity";
 import { CosmosClient } from "@azure/cosmos";
+import dotenv from "dotenv";
+import assert from "assert";
 
-const endpoint = process.env.COSMOS_ENDPOINT as string;
+dotenv.config();
+const endpoint = process.env.COSMOS_ENDPOINT;
+debugger;
+assert(!!endpoint);
 
 const cosmosClient = new CosmosClient({
     endpoint: endpoint,
