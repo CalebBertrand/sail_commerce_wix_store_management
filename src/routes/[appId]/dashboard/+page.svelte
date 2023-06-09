@@ -50,8 +50,8 @@
 		};
 
 		appState.update((state) => ({ ...state, selectedProduct: newProduct }));
-		goto(`dashboard/product/${newProduct.guid}`);
 		console.log($appState);
+		goto(`dashboard/product/${newProduct.guid}`);
 	}
 	function gotoProductDetail(product: Product): void {
 		appState.update((state) => ({ ...state, selectedProduct: product }));

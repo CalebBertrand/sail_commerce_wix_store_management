@@ -299,8 +299,9 @@ describe('The expression parser', () => {
 
         expect(typeof result).toBe('object');
         expect(result.isComposite).toBe(true);
-        expect(result.operationType).toBe('Number');
-        expect(result.numberOperation).toBe('+');
+        expect(result.operationType).toBe('Unary');
+        expect(result.unaryOperation).toBe('+');
+        expect(result.type).toBe('Number');
 
         const leftHand = result.leftHand;
         expect(leftHand.isComposite).toBe(true);

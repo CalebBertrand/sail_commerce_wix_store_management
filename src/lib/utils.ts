@@ -16,3 +16,13 @@ export function indexOfBackwards(str: string, substring: string, start?: number)
     }
     return -1;
 }
+
+function onDocumentReady(callback: () => void) {
+    // see if DOM is already available
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+        // call on next available tick
+        setTimeout(callback, 1);
+    } else {
+        document.addEventListener("DOMContentLoaded", callback);
+    }
+}    

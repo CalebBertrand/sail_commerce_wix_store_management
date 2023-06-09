@@ -21,17 +21,34 @@
 		isProductOptionNumber,
 		type SelectProductOption,
 		type ProductOption,
+		ProductOptionTypes,
 	} from "$lib/product";
 	import Sortable from "sortablejs";
+	import { delay, fromEvent, merge, throttleTime } from "rxjs";
+	import {
+		parsePriceFormula,
+		type Expression,
+	} from "$lib/price-formula-parser/price-formula-parser";
 
 	let appState = getContext("state") as Writable<AppState>;
 	if (!$appState.selectedProduct) {
 		goto("/");
 	}
 	let product = $appState.selectedProduct as Product;
+	let priceFormulaExpressionTree: Expression | undefined = undefined;
+	let errors: Record<string, string> = {};
 
 	let confirmNoSaveModalShown = false;
 	let confirmedNoSave = false; // for if the user tries to navigate away with invalid data
+
+	function createOption(type: ProductOptionTypes): void {
+		const order = product.options.length + 1;
+		const newOption =
+			type === ProductOptionTypes.Number
+				? { name: "", order, type }
+				: { name: "", order, type, values: [] };
+		product.options = [...product.options, newOption];
+	}
 
 	// Svelte doesn't yet support type guards :( so just have to be careful to only call this on options that are selects
 	function removeValueFromSelect(option: ProductOption, value: string): void {
@@ -40,11 +57,25 @@
 		).values.filter((v) => v !== value);
 	}
 
-	function validateChanges(): Record<string, string> {
-		let errors: Record<string, string> = {};
-		if (isNilOrWhitespace(product.name))
-			errors["Product Name"] = "Cannot be empty.";
-		return errors;
+	function validateName(): void {
+		errors["Product Name"] = isNilOrWhitespace(product.name)
+			? "Cannot be empty."
+			: "";
+	}
+	function validatePriceFormula(): void {
+		if (!product.priceFormula) {
+			errors["Price Formula"] = "Cannot be empty.";
+		} else {
+			const expression = parsePriceFormula(
+				product.priceFormula,
+				product.options
+			);
+			if (typeof expression === "string") {
+				errors["Price Formula"] = expression;
+			} else {
+				errors["Price Formula"] = "";
+			}
+		}
 	}
 
 	function confirmNoSave(): void {
@@ -53,11 +84,7 @@
 	}
 
 	beforeNavigate((navigation) => {
-		if (
-			product &&
-			!confirmedNoSave &&
-			Object.keys(validateChanges()).length !== 0
-		) {
+		if (product && !confirmedNoSave && Object.keys(errors).length !== 0) {
 			confirmNoSaveModalShown = true;
 			navigation.cancel();
 		}
@@ -71,6 +98,18 @@
 			animation: 175,
 			dragClass: "",
 		});
+
+		const nameInput = document.getElementById("product-name") as HTMLElement;
+		fromEvent(nameInput, "input")
+			.pipe(delay(1), throttleTime(100))
+			.subscribe(validateName);
+
+		const priceFormulaInput = document.getElementById(
+			"price-formula-input"
+		) as HTMLElement;
+		fromEvent(priceFormulaInput, "input")
+			.pipe(delay(1), throttleTime(100))
+			.subscribe(validatePriceFormula);
 	});
 </script>
 
@@ -83,13 +122,14 @@
 		</TooltipDefinition>
 
 		<TextInput
+			id="product-name"
 			class="flex-grow text-xl header-input"
 			hideLabel
 			labelText="Product Name"
 			placeholder="Enter Product Name..."
 			size="xl"
-			invalid={!product.name}
-			invalidText="Required"
+			invalid={!!errors["Product Name"]}
+			invalidText={errors["Product Name"]}
 			bind:value={product.name}
 		/>
 
@@ -104,7 +144,36 @@
 
 <!-- Options -->
 <div class="p-3">
-	<h5 class="mb-1">Product Options</h5>
+	<div class="mb-3">
+		<h5 class="mb-3 float-left">Product Options</h5>
+
+		<TooltipDefinition
+			class="float-right mx-1"
+			tooltipText="Number options allow shoppers to select a decimal or integer."
+		>
+			<Button
+				kind="tertiary"
+				size="small"
+				icon={Add}
+				on:click={() => createOption(ProductOptionTypes.Number)}
+				>New Number Option</Button
+			>
+		</TooltipDefinition>
+		<TooltipDefinition
+			class="float-right mx-1"
+			tooltipText="Select options allow shoppers to select one of multiple options."
+		>
+			<Button
+				kind="tertiary"
+				size="small"
+				icon={Add}
+				on:click={() => createOption(ProductOptionTypes.Select)}
+				>New Select Option</Button
+			>
+		</TooltipDefinition>
+
+		<div class="clear-both" />
+	</div>
 
 	<div id="options-list">
 		{#each product.options.sort((option) => option.order) as option}
@@ -195,11 +264,14 @@
 	<h5 class="mb-1">Price Formula</h5>
 
 	<TextArea
+		id="price-formula-input"
 		hideLabel
 		placeholder="Enter formula here..."
-		rows={6}
-		class="mb-2"
+		rows={3}
+		class="mb-2 text-lg"
 		bind:value={product.priceFormula}
+		invalid={!!errors["Price Formula"]}
+		invalidText={errors["Price Formula"]}
 	/>
 	<p class="leading-8">
 		An Excel-like formula that will determine the price for this product.
@@ -225,12 +297,18 @@
 		on:close
 		on:submit={() => confirmNoSave()}
 	>
-		{@const errors = Object.entries(validateChanges())}
+		{@const errorEntries = Object.entries(errors)}
 		<p>
-			{#each errors as [field, errorMsg]}
+			{#each errorEntries as [field, errorMsg]}
 				{field}: {errorMsg}
 				<br />
 			{/each}
 		</p>
 	</Modal>
 {/if}
+
+<style>
+	.text-lg::placeholder {
+		font-size: 1.25rem;
+	}
+</div>

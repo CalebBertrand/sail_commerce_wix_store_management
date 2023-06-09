@@ -1,4 +1,3 @@
-import { indexOfBackwards } from "../../lib/utils";
 import { ProductOptionTypes, type ProductOption } from "../product";
 
 enum ExpressionTypes {
@@ -24,7 +23,7 @@ type EqualityOperations = UnaryOperations.EqualityComparison | UnaryOperations.G
 type ExpressionBase = {
     type: ExpressionTypes;
 }
-type Expression = ExpressionBase & ({
+export type Expression = ExpressionBase & ({
     isComposite: true;
     operationType: OperationTypes.Turnary;
     conditionalExpression: Expression;
@@ -87,44 +86,53 @@ export function parseExpressionString(formula: string, options: Array<ProductOpt
     // NOTE: The order of the below checks matters! They correspond to the order of operations
 
     // Empty string
-    if (!formula.length) return 'Empty!';
+    if (!formula.length) return 'Empty space, expected a value.';
 
-    let firstExpression: Expression;
-    let leftHandEndIndex = -1;
+    // First expression of the string. There could be another if it's a composite expression
+    let expression: Expression | undefined = undefined;
+    let expressionEndIndex = -1;
 
     // First expression is an IF() statement
-    if (formula.slice(0, 3) === 'IF(') {
+    if (formula.substring(0, 3) === 'IF(') {
         const endIndex = formula.length - 1;
 
-        // TODO: This is a hacky way to check for a closing parenthesis. We should use a stack instead.
-        if (formula[endIndex] !== ')') return `Could not find a closing ) for the IF(. Unexpected ${formula.substring(endIndex + 1)}`;
-
-        let firstCommaIndex = 0;
+        let firstCommaIndex = 2;
+        let parenthesisNesting = 1;
         // while loop to make sure we only get commas in this IF() function, not nested ones
         do {
-            const pastIndex = firstCommaIndex;
-            firstCommaIndex = formula.indexOf(',', firstCommaIndex + 1);
-
-            console.log(firstCommaIndex, formula);
-
-            // if we are making no progress, there is a missing comma
-            if (firstCommaIndex === pastIndex || firstCommaIndex < 0) return 'Missing parameter for IF() function.';
-        } while (isCommaInNestedIf(formula, firstCommaIndex));
+            firstCommaIndex++;
+            if (formula[firstCommaIndex] === '(') parenthesisNesting++;
+            if (formula[firstCommaIndex] === ')') parenthesisNesting--;
+            if (formula[firstCommaIndex] === ',' && parenthesisNesting === 1) break;
+        } while (firstCommaIndex <= endIndex);
+        if (firstCommaIndex > endIndex) return 'Missing parameter for IF() function.';
 
         let secondCommaIndex = firstCommaIndex;
+        parenthesisNesting = 1;
         // while loop to make sure we only get commas in this IF() function, not nested ones
         do {
-            const pastIndex = secondCommaIndex;
-            secondCommaIndex = formula.indexOf(',', secondCommaIndex + 1);
+            secondCommaIndex++;
+            if (formula[secondCommaIndex] === '(') parenthesisNesting++;
+            if (formula[secondCommaIndex] === ')') parenthesisNesting--;
+            if (formula[secondCommaIndex] === ',' && parenthesisNesting === 1) break;
+        } while (secondCommaIndex <= endIndex);
+        if (secondCommaIndex > endIndex) return 'Missing parameter for IF() function.';
 
-            // if we are making no progress, there is a missing comma
-            if (secondCommaIndex === pastIndex || secondCommaIndex < 0) return 'Missing parameter for IF() function.';
-        } while (isCommaInNestedIf(formula, secondCommaIndex));
+        // Make sure there is a closing parenthesis
+        expressionEndIndex = secondCommaIndex;
+        parenthesisNesting = 1;
+        do {
+            expressionEndIndex++;
+            if (formula[expressionEndIndex] === ')') parenthesisNesting--;
+            if (formula[expressionEndIndex] === '(') parenthesisNesting++;
+            if (parenthesisNesting === 0) break;
+        } while (expressionEndIndex <= endIndex);
+        if (expressionEndIndex > endIndex) return 'Missing closing parenthesis for IF() function.';
 
         const expressions = [
             parseExpressionString(formula.substring(3, firstCommaIndex), options),
             parseExpressionString(formula.substring(firstCommaIndex + 1, secondCommaIndex), options),
-            parseExpressionString(formula.substring(secondCommaIndex + 1, endIndex), options)
+            parseExpressionString(formula.substring(secondCommaIndex + 1, expressionEndIndex), options)
         ];
 
         // If there are errors in the sub expressions, throw the first one
@@ -132,10 +140,10 @@ export function parseExpressionString(formula: string, options: Array<ProductOpt
         if (firstError) return firstError;
 
         const [conditionalExpression, trueExpression, falseExpression] = expressions as Array<Expression>;
-        if (conditionalExpression.type !== ExpressionTypes.Boolean) return 'The first parameter to a IF() function must be a boolean';
+        if (conditionalExpression.type !== ExpressionTypes.Boolean) return 'The first parameter to a IF() function must be a condition.';
         if (trueExpression.type !== falseExpression.type) return 'The last two parameters of an IF() function must be the same type (number, string or boolean).';
 
-        return {
+        expression = {
             isComposite: true,
             type: trueExpression.type,
             operationType: OperationTypes.Turnary,
@@ -147,19 +155,13 @@ export function parseExpressionString(formula: string, options: Array<ProductOpt
 
     // First expression is a string
     if (formula[0] === '"') {
-        leftHandEndIndex = formula.indexOf('"', 1);
-        if (leftHandEndIndex < 0) return 'Missing double quotes to close string.';
-        firstExpression = {
+        expressionEndIndex = formula.indexOf('"', 1);
+        if (expressionEndIndex < 0) return 'Missing double quotes to close string.';
+        expression = {
             type: ExpressionTypes.String,
             isComposite: false,
-            value: formula.substring(1, leftHandEndIndex)
+            value: formula.substring(1, expressionEndIndex)
         };
-
-        leftHandEndIndex += 1;
-
-        // There is nothing else, this is just a literal string
-        if (formula.trimEnd().length - 1 < leftHandEndIndex) return firstExpression;
-        return parseUnaryOperationString(firstExpression, formula.substring(leftHandEndIndex), options);
     }
 
     // First expression is an option value
@@ -173,14 +175,14 @@ export function parseExpressionString(formula: string, options: Array<ProductOpt
 
         switch (option.type) {
             case ProductOptionTypes.Number:
-                firstExpression = {
+                expression = {
                     type: ExpressionTypes.Number,
                     isComposite: false,
                     optionName: option.name
                 };
                 break;
             case ProductOptionTypes.Select:
-                firstExpression = {
+                expression = {
                     type: ExpressionTypes.String,
                     isComposite: false,
                     optionName: option.name
@@ -188,11 +190,7 @@ export function parseExpressionString(formula: string, options: Array<ProductOpt
                 break;
         }
 
-        leftHandEndIndex = closingBracket + 2;
-
-        // There is nothing else, this is just a literal
-        if (formula.trimEnd().length - 1 < leftHandEndIndex) return firstExpression;
-        return parseUnaryOperationString(firstExpression, formula.substring(leftHandEndIndex), options);
+        expressionEndIndex = closingBracket + 1;
     }
 
     // First expression is a number
@@ -204,19 +202,21 @@ export function parseExpressionString(formula: string, options: Array<ProductOpt
             i++;
         }
 
-        leftHandEndIndex = i;
-        firstExpression = {
+        expression = {
             type: ExpressionTypes.Number,
             isComposite: false,
-            value: formula.substring(0, leftHandEndIndex)
+            value: formula.substring(0, i)
         };
-
-        // There is nothing else, this is just a literal number
-        if (formula.trimEnd().length - 1 < leftHandEndIndex) return firstExpression;
-        return parseUnaryOperationString(firstExpression, formula.substring(leftHandEndIndex), options);
+        expressionEndIndex = i - 1;
     }
 
-    return `Unexpected character ${formula[0]}`;
+    if (!expression) return `Unexpected character ${formula[0]}`
+
+    // There is nothing else, this is just a literal
+    if (formula.trimEnd().length - 1 < expressionEndIndex + 1) return expression;
+
+    // Otherwise, parse the rest of the formula
+    return parseUnaryOperationString(expression, formula.substring(expressionEndIndex + 1), options);
 }
 
 /** 
@@ -251,8 +251,4 @@ function isUnaryOperation(operation: string): operation is UnaryOperations {
 
 function isEqualityOperation(operation: UnaryOperations): operation is EqualityOperations {
     return equalityOperations.includes(operation);
-}
-
-function isCommaInNestedIf(formula: string, index: number): boolean {
-    return indexOfBackwards(formula, '(', index) !== 2 && formula.indexOf(')', index) !== formula.length - 1;
 }
