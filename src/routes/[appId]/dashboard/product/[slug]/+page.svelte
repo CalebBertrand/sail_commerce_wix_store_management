@@ -10,7 +10,13 @@
 		Tag,
 	} from "carbon-components-svelte";
 	import { getContext, onMount } from "svelte";
-	import { Add, ChevronLeft, DragVertical, Save } from "carbon-icons-svelte";
+	import {
+		Add,
+		ChevronLeft,
+		Close,
+		DragVertical,
+		Save,
+	} from "carbon-icons-svelte";
 	import { beforeNavigate, goto } from "$app/navigation";
 	import type { Writable } from "svelte/store";
 	import type { AppState } from "$lib/stores";
@@ -25,17 +31,13 @@
 	} from "$lib/product";
 	import Sortable from "sortablejs";
 	import { delay, fromEvent, merge, throttleTime } from "rxjs";
-	import {
-		parsePriceFormula,
-		type Expression,
-	} from "$lib/price-formula-parser/price-formula-parser";
+	import { parsePriceFormula } from "$lib/price-formula-parser/price-formula-parser";
 
 	let appState = getContext("state") as Writable<AppState>;
 	if (!$appState.selectedProduct) {
-		goto("/");
+		goto(`/${$appState.appId}/dashboard`);
 	}
 	let product = $appState.selectedProduct as Product;
-	let priceFormulaExpressionTree: Expression | undefined = undefined;
 	let errors: Record<string, string> = {};
 
 	let confirmNoSaveModalShown = false;
@@ -52,9 +54,24 @@
 
 	// Svelte doesn't yet support type guards :( so just have to be careful to only call this on options that are selects
 	function removeValueFromSelect(option: ProductOption, value: string): void {
-		(option as SelectProductOption).values = (
-			option as SelectProductOption
-		).values.filter((v) => v !== value);
+		const cast = option as SelectProductOption;
+		cast.values = cast.values.filter((v) => v !== value);
+		const optionIndex = product.options.findIndex((o) => o === option);
+
+		// trigger refresh on the option and it's values
+		product.options[optionIndex] = {
+			...cast,
+		};
+	}
+	function addValueToSelect(option: ProductOption, value: string): void {
+		const cast = option as SelectProductOption;
+		cast.values = [...cast.values, value];
+		const optionIndex = product.options.findIndex((o) => o === option);
+
+		// trigger refresh on the option and it's values
+		product.options[optionIndex] = {
+			...cast,
+		};
 	}
 
 	function validateName(): void {
@@ -80,7 +97,7 @@
 
 	function confirmNoSave(): void {
 		confirmedNoSave = true;
-		goto("/");
+		goto(`/${$appState.appId}/dashboard`);
 	}
 
 	beforeNavigate((navigation) => {
@@ -123,7 +140,7 @@
 
 		<TextInput
 			id="product-name"
-			class="flex-grow text-xl header-input"
+			class="flex-grow header-input"
 			hideLabel
 			labelText="Product Name"
 			placeholder="Enter Product Name..."
@@ -148,7 +165,7 @@
 		<h5 class="mb-3 float-left">Product Options</h5>
 
 		<TooltipDefinition
-			class="float-right mx-1"
+			class="float-right m-1"
 			tooltipText="Number options allow shoppers to select a decimal or integer."
 		>
 			<Button
@@ -160,7 +177,7 @@
 			>
 		</TooltipDefinition>
 		<TooltipDefinition
-			class="float-right mx-1"
+			class="float-right m-1"
 			tooltipText="Select options allow shoppers to select one of multiple options."
 		>
 			<Button
@@ -226,29 +243,36 @@
 								</TooltipDefinition>
 							</div>
 						{:else if isProductOptionSelect(option)}
-							<div class="whitespace-nowrap">
-								<div class="inline-block">
-									<TextInput
-										labelText="New Option"
-										placeholder="Option name..."
-									/>
-								</div>
-								<div class="inline-block">
-									<Button
-										icon={Add}
-										iconDescription="Add Option"
-										kind="tertiary"
-										class="inline-block"
-									/>
-								</div>
-							</div>
 							<div>
-								{#each option.values as value}
-									<Tag
-										filter
-										on:close={() => removeValueFromSelect(option, value)}
-										>{value}</Tag
+								<div class="rounded" />
+								<div class="large-tag">
+									<TextInput
+										size="sm"
+										placeholder="New selectable name..."
+										class="bg-transparent ml-3"
+									/>
+
+									<!-- svelte-ignore a11y-click-events-have-key-events -->
+									<div
+										class="w-fit h-fit rounded-full mt-2 ml-2 hover:cursor-pointer hover:scale-125 transition-transform"
+										on:click={() => addValueToSelect()}
 									>
+										<Add size={24} />
+									</div>
+								</div>
+
+								{#each option.values as value}
+									<div class="large-tag">
+										{value}
+
+										<!-- svelte-ignore a11y-click-events-have-key-events -->
+										<div
+											class="w-fit h-fit rounded-full mt-2 ml-2 hover:cursor-pointer hover:scale-125 transition-transform"
+											on:click={() => removeValueFromSelect(option, value)}
+										>
+											<Close size={24} />
+										</div>
+									</div>
 								{/each}
 							</div>
 						{/if}
@@ -306,9 +330,3 @@
 		</p>
 	</Modal>
 {/if}
-
-<style>
-	.text-lg::placeholder {
-		font-size: 1.25rem;
-	}
-</div>
