@@ -7,7 +7,6 @@
 		TextArea,
 		NumberInput,
 		Toggle,
-		Tag,
 	} from "carbon-components-svelte";
 	import { getContext, onMount } from "svelte";
 	import {
@@ -30,25 +29,42 @@
 		ProductOptionTypes,
 	} from "$lib/product";
 	import Sortable from "sortablejs";
-	import { delay, fromEvent, merge, throttleTime } from "rxjs";
+	import { delay, fromEvent, throttleTime } from "rxjs";
 	import { parsePriceFormula } from "$lib/price-formula-parser/price-formula-parser";
+	import { fade } from "svelte/transition";
 
 	let appState = getContext("state") as Writable<AppState>;
 	if (!$appState.selectedProduct) {
 		goto(`/${$appState.appId}/dashboard`);
 	}
 	let product = $appState.selectedProduct as Product;
-	let errors: Record<string, string> = {};
+	let errors: {
+		priceFormula: string;
+		name: string;
+		options: {
+			[guid: string]: {
+				values?: string;
+				name?: string;
+				min?: string;
+				max?: string;
+			};
+		};
+	} = {
+		priceFormula: "",
+		name: "",
+		options: {},
+	};
 
 	let confirmNoSaveModalShown = false;
 	let confirmedNoSave = false; // for if the user tries to navigate away with invalid data
+	let valueInputsByOptionGuid: Record<string, string> = {};
 
 	function createOption(type: ProductOptionTypes): void {
 		const order = product.options.length + 1;
 		const newOption =
 			type === ProductOptionTypes.Number
-				? { name: "", order, type }
-				: { name: "", order, type, values: [] };
+				? { name: "", order, type, guid: crypto.randomUUID() }
+				: { name: "", order, type, values: [], guid: crypto.randomUUID() };
 		product.options = [...product.options, newOption];
 	}
 
@@ -62,9 +78,18 @@
 		product.options[optionIndex] = {
 			...cast,
 		};
+
+		// to be sure there are not 0 values
+		validateOption(product.options[optionIndex]);
 	}
-	function addValueToSelect(option: ProductOption, value: string): void {
+	function addValueToSelect(option: ProductOption): void {
+		const value = valueInputsByOptionGuid[option.guid];
 		const cast = option as SelectProductOption;
+		if (!value || cast.values.some((v) => v === value)) {
+			validateOption(option);
+			return;
+		}
+
 		cast.values = [...cast.values, value];
 		const optionIndex = product.options.findIndex((o) => o === option);
 
@@ -72,26 +97,54 @@
 		product.options[optionIndex] = {
 			...cast,
 		};
+
+		// clear the input
+		valueInputsByOptionGuid[option.guid] = "";
 	}
 
 	function validateName(): void {
-		errors["Product Name"] = isNilOrWhitespace(product.name)
-			? "Cannot be empty."
-			: "";
+		errors.name = isNilOrWhitespace(product.name) ? "Cannot be empty." : "";
 	}
 	function validatePriceFormula(): void {
 		if (!product.priceFormula) {
-			errors["Price Formula"] = "Cannot be empty.";
+			errors.name = "Cannot be empty.";
 		} else {
 			const expression = parsePriceFormula(
 				product.priceFormula,
 				product.options
 			);
 			if (typeof expression === "string") {
-				errors["Price Formula"] = expression;
+				errors.name = expression;
 			} else {
-				errors["Price Formula"] = "";
+				errors.name = "";
 			}
+		}
+	}
+	function validateOption(option: ProductOption): void {
+		errors.options[option.guid] = {};
+		if (isNilOrWhitespace(option.name)) {
+			errors.options[option.guid].name = "Cannot be empty.";
+		} else if (
+			product.options.some(
+				(optn) => optn.guid !== option.guid && optn.name === option.name
+			)
+		) {
+			errors.options[option.guid].name = "Cannot have duplicate option names.";
+		}
+
+		if (isProductOptionSelect(option)) {
+			if (!option.values.length)
+				errors.options[option.guid].values = "Must have at least one value.";
+
+			// check that the value to be added is not already in the list
+			const inputValue = valueInputsByOptionGuid[option.guid];
+			if (!!inputValue && option.values.some((v) => v === inputValue))
+				errors.options[option.guid].values = "Cannot add duplicate values.";
+		} else if (isProductOptionNumber(option)) {
+			if (option.min && option.min < 0)
+				errors.options[option.guid].min = "Must be greater than or equal to 0.";
+			if (option.max && option.min && option.max <= option.min)
+				errors.options[option.guid].max = "Max must be greater than min.";
 		}
 	}
 
@@ -140,13 +193,13 @@
 
 		<TextInput
 			id="product-name"
-			class="flex-grow header-input"
+			class="flex-grow header-input input-transparent-background"
 			hideLabel
 			labelText="Product Name"
 			placeholder="Enter Product Name..."
 			size="xl"
-			invalid={!!errors["Product Name"]}
-			invalidText={errors["Product Name"]}
+			invalid={!!errors.name}
+			invalidText={errors.name}
 			bind:value={product.name}
 		/>
 
@@ -193,7 +246,8 @@
 	</div>
 
 	<div id="options-list">
-		{#each product.options.sort((option) => option.order) as option}
+		{#each product.options.sort((option) => option.order) as option (option.guid)}
+			{@const optionErrors = errors.options[option.guid] ?? {}}
 			<div class="mb-2 p-4 box-shadow bg-ui-01-color hoverable flex gap-4">
 				<div class="grow-0 flex items-center">
 					<DragVertical
@@ -212,6 +266,9 @@
 								labelText="Name"
 								placeholder="Enter name..."
 								bind:value={option.name}
+								on:input={() => validateOption(option)}
+								invalid={!!optionErrors.name}
+								invalidText={optionErrors.name}
 							/>
 						</div>
 						{#if isProductOptionNumber(option)}
@@ -222,7 +279,10 @@
 									label="Min"
 									helperText="Leave blank for no min requirement."
 									min={0}
+									invalid={!!optionErrors.min}
+									invalidText={optionErrors.min}
 									bind:value={option.min}
+									on:input={() => validateOption(option)}
 								/>
 							</div>
 							<div>
@@ -231,8 +291,11 @@
 									hideSteppers
 									label="Max"
 									helperText="Leave blank for no max requirement."
-									min={0}
+									min={option.min ?? 0}
+									invalid={!!optionErrors.max}
+									invalidText={optionErrors.max}
 									bind:value={option.max}
+									on:input={() => validateOption(option)}
 								/>
 							</div>
 							<div>
@@ -244,36 +307,47 @@
 							</div>
 						{:else if isProductOptionSelect(option)}
 							<div>
-								<div class="rounded" />
-								<div class="large-tag">
-									<TextInput
-										size="sm"
-										placeholder="New selectable name..."
-										class="bg-transparent ml-3"
-									/>
-
-									<!-- svelte-ignore a11y-click-events-have-key-events -->
-									<div
-										class="w-fit h-fit rounded-full mt-2 ml-2 hover:cursor-pointer hover:scale-125 transition-transform"
-										on:click={() => addValueToSelect()}
-									>
-										<Add size={24} />
-									</div>
+								<div class="w-full">
+									<span class="small-label">Values</span>
 								</div>
-
-								{#each option.values as value}
-									<div class="large-tag">
-										{value}
+								<div>
+									<div class="large-tag mt-0">
+										<TextInput
+											size="sm"
+											placeholder="New selectable name..."
+											class="input-transparent-background ml-3"
+											bind:value={valueInputsByOptionGuid[option.guid]}
+											on:blur={() => validateOption(option)}
+										/>
 
 										<!-- svelte-ignore a11y-click-events-have-key-events -->
 										<div
-											class="w-fit h-fit rounded-full mt-2 ml-2 hover:cursor-pointer hover:scale-125 transition-transform"
-											on:click={() => removeValueFromSelect(option, value)}
+											class="w-fit h-fit rounded-full mt-1 ml-2 hover:cursor-pointer hover:scale-125 transition-transform"
+											on:click={() => addValueToSelect(option)}
 										>
-											<Close size={24} />
+											<Add size={24} />
 										</div>
 									</div>
-								{/each}
+
+									{#each option.values as value}
+										<div in:fade={{ duration: 150 }} class="large-tag mt-0">
+											{value}
+
+											<!-- svelte-ignore a11y-click-events-have-key-events -->
+											<div
+												class="w-fit h-fit rounded-full mt-1 ml-2 hover:cursor-pointer hover:scale-125 transition-transform"
+												on:click={() => removeValueFromSelect(option, value)}
+											>
+												<Close size={24} />
+											</div>
+										</div>
+									{/each}
+								</div>
+								{#if optionErrors.values}
+									<div class="w-full">
+										<span class="invalid-text">{optionErrors.values}</span>
+									</div>
+								{/if}
 							</div>
 						{/if}
 					</div>
@@ -294,8 +368,8 @@
 		rows={3}
 		class="mb-2 text-lg"
 		bind:value={product.priceFormula}
-		invalid={!!errors["Price Formula"]}
-		invalidText={errors["Price Formula"]}
+		invalid={!!errors.priceFormula}
+		invalidText={errors.priceFormula}
 	/>
 	<p class="leading-8">
 		An Excel-like formula that will determine the price for this product.

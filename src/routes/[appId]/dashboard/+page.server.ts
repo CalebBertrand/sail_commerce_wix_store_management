@@ -18,8 +18,22 @@ export async function load({ params }): Promise<{ products: Array<Product> }> {
                 appId: 'testId',
                 name: 'Test Product',
                 options: [
-                    { type: ProductOptionTypes.Number, order: 1, name: 'Test Number', min: 1, max: 10, integer: true },
-                    { type: ProductOptionTypes.Select, order: 1, name: 'Test Select', values: ['option a', 'option b', 'option c'] }
+                    {
+                        type: ProductOptionTypes.Number,
+                        order: 1,
+                        name: 'Test Number',
+                        min: 1,
+                        max: 10,
+                        integer: true,
+                        guid: crypto.randomUUID()
+                    },
+                    {
+                        type: ProductOptionTypes.Select,
+                        order: 1,
+                        name: 'Test Select',
+                        values: ['option a', 'option b', 'option c'],
+                        guid: crypto.randomUUID()
+                    }
                 ],
                 priceFormula: "1 + 1",
             }

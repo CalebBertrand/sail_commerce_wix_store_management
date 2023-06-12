@@ -6,6 +6,7 @@ export enum ProductOptionTypes {
 type ProductOptionBase = {
     order: number;
     name: string;
+    guid: string;
 }
 
 export type NumberProductOption = ProductOptionBase & {
