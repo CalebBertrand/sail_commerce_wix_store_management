@@ -15,6 +15,7 @@
 		Close,
 		DragVertical,
 		Save,
+		TrashCan,
 	} from "carbon-icons-svelte";
 	import { beforeNavigate, goto } from "$app/navigation";
 	import type { Writable } from "svelte/store";
@@ -66,6 +67,9 @@
 				? { name: "", order, type, guid: crypto.randomUUID() }
 				: { name: "", order, type, values: [], guid: crypto.randomUUID() };
 		product.options = [...product.options, newOption];
+	}
+	function deleteOption(option: ProductOption): void {
+		product.options = product.options.filter((o) => o.guid !== option.guid);
 	}
 
 	// Svelte doesn't yet support type guards :( so just have to be careful to only call this on options that are selects
@@ -135,11 +139,6 @@
 		if (isProductOptionSelect(option)) {
 			if (!option.values.length)
 				errors.options[option.guid].values = "Must have at least one value.";
-
-			// check that the value to be added is not already in the list
-			const inputValue = valueInputsByOptionGuid[option.guid];
-			if (!!inputValue && option.values.some((v) => v === inputValue))
-				errors.options[option.guid].values = "Cannot add duplicate values.";
 		} else if (isProductOptionNumber(option)) {
 			if (option.min && option.min < 0)
 				errors.options[option.guid].min = "Must be greater than or equal to 0.";
@@ -148,13 +147,40 @@
 		}
 	}
 
+	function anyInvalidFields(): boolean {
+		return (
+			!!errors.name ||
+			!!errors.priceFormula ||
+			Object.values(errors.options).some((optionErrors) => {
+				return (
+					!!optionErrors.name ||
+					!!optionErrors.values ||
+					!!optionErrors.min ||
+					!!optionErrors.max
+				);
+			})
+		);
+	}
+
 	function confirmNoSave(): void {
 		confirmedNoSave = true;
 		goto(`/${$appState.appId}/dashboard`);
 	}
 
+	function handleSort(event: Sortable.SortableEvent): void {
+		const oldOrder = event.oldIndex! + 1;
+		const newOrder = event.newIndex! + 1;
+		product.options.forEach((option) => {
+			if (option.order === oldOrder) option.order = newOrder;
+			else if (option.order > oldOrder && option.order <= newOrder)
+				option.order--;
+			else if (option.order < oldOrder && option.order >= newOrder)
+				option.order++;
+		});
+	}
+
 	beforeNavigate((navigation) => {
-		if (product && !confirmedNoSave && Object.keys(errors).length !== 0) {
+		if (product && !confirmedNoSave && anyInvalidFields()) {
 			confirmNoSaveModalShown = true;
 			navigation.cancel();
 		}
@@ -167,6 +193,7 @@
 			handle: ".options-drag-handle",
 			animation: 175,
 			dragClass: "",
+			onSort: handleSort,
 		});
 
 		const nameInput = document.getElementById("product-name") as HTMLElement;
@@ -186,7 +213,11 @@
 <div class="mb-6">
 	<div class="flex">
 		<TooltipDefinition tooltipText="Back" class="flex-shrink mx-2">
-			<Button kind="ghost" class="h-full mr-2" on:click={() => goto("/")}>
+			<Button
+				kind="ghost"
+				class="h-full mr-2"
+				on:click={() => goto(`/${$appState.appId}/dashboard`)}
+			>
 				<ChevronLeft size={32} class="text-white" />
 			</Button>
 		</TooltipDefinition>
@@ -248,7 +279,7 @@
 	<div id="options-list">
 		{#each product.options.sort((option) => option.order) as option (option.guid)}
 			{@const optionErrors = errors.options[option.guid] ?? {}}
-			<div class="mb-2 p-4 box-shadow bg-ui-01-color hoverable flex gap-4">
+			<div class="mb-5 p-4 box-shadow bg-ui-01-color hoverable flex gap-4">
 				<div class="grow-0 flex items-center">
 					<DragVertical
 						size={24}
@@ -256,9 +287,23 @@
 					/>
 				</div>
 				<div class="w-full">
-					<span class="font-normal text-base block"
-						>Type: <strong>{option.type}</strong></span
-					>
+					<div class="w-full">
+						<span class="font-normal text-base block float-left"
+							>Type: <strong>{option.type}</strong></span
+						>
+
+						<Button
+							kind="danger-tertiary"
+							icon={TrashCan}
+							size="small"
+							iconDescription="Delete this option."
+							class="float-right"
+							on:click={() => deleteOption(option)}
+						/>
+
+						<div class="clear-both" />
+					</div>
+
 					<hr class="mb-4" />
 					<div class="grow flex gap-3 flex-wrap">
 						<div class="w-1/3 min-w-max">
@@ -312,13 +357,17 @@
 								</div>
 								<div>
 									<div class="large-tag mt-0">
-										<TextInput
-											size="sm"
-											placeholder="New selectable name..."
-											class="input-transparent-background ml-3"
-											bind:value={valueInputsByOptionGuid[option.guid]}
-											on:blur={() => validateOption(option)}
-										/>
+										<TooltipDefinition
+											tooltipText="Type a new selectable value, and click the plus to add."
+										>
+											<TextInput
+												size="sm"
+												placeholder="New selectable name..."
+												class="input-transparent-background ml-3"
+												bind:value={valueInputsByOptionGuid[option.guid]}
+												on:blur={() => validateOption(option)}
+											/>
+										</TooltipDefinition>
 
 										<!-- svelte-ignore a11y-click-events-have-key-events -->
 										<div
@@ -343,7 +392,13 @@
 										</div>
 									{/each}
 								</div>
-								{#if optionErrors.values}
+								{#if option.values.some((v) => v === valueInputsByOptionGuid[option.guid])}
+									<div class="w-full">
+										<span class="invalid-text"
+											>Selectable value already exisits.</span
+										>
+									</div>
+								{:else if optionErrors.values}
 									<div class="w-full">
 										<span class="invalid-text">{optionErrors.values}</span>
 									</div>
@@ -395,11 +450,38 @@
 		on:close
 		on:submit={() => confirmNoSave()}
 	>
-		{@const errorEntries = Object.entries(errors)}
 		<p>
-			{#each errorEntries as [field, errorMsg]}
-				{field}: {errorMsg}
+			{#if errors.name}
+				Name: {errors.name}<br />
 				<br />
+			{/if}
+
+			{#if errors.priceFormula}
+				Price Formula: {errors.priceFormula}<br />
+				<br />
+			{/if}
+
+			{#each product.options as option}
+				{@const optionErrors = errors.options[option.guid] ?? {}}
+				{#if optionErrors.name}
+					{option.name} Name: {optionErrors.name}
+					<br />
+				{/if}
+
+				{#if optionErrors.values}
+					{option.name} Selectable Values: {optionErrors.values}
+					<br />
+				{/if}
+
+				{#if optionErrors.min}
+					{option.name} Min: {optionErrors.min}
+					<br />
+				{/if}
+
+				{#if optionErrors.max}
+					{option.name} Max: {optionErrors.max}
+					<br />
+				{/if}
 			{/each}
 		</p>
 	</Modal>
