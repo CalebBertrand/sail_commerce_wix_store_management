@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { appStateFactory, type AppState } from "$lib/stores";
+	import { appStateFactory } from "$lib/stores";
 	import {
 		Header,
 		Content,
