@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: AutoModality/action-clean@v1
       - uses: actions/checkout@v2
 
       - name: Set up Node.js version
