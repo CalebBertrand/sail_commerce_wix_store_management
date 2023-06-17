@@ -14,7 +14,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: AutoModality/action-clean@v1
+      - name: 'Cleanup build folder'
+        run: |
+          ls -la ./
+          rm -rf ./* || true
+          rm -rf ./.??* || true
+          ls -la ./
       - uses: actions/checkout@v2
 
       - name: Set up Node.js version
