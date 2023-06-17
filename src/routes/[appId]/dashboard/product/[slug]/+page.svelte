@@ -111,16 +111,16 @@
 	}
 	function validatePriceFormula(): void {
 		if (!product.priceFormula) {
-			errors.name = "Cannot be empty.";
+			errors.priceFormula = "Cannot be empty.";
 		} else {
 			const expression = parsePriceFormula(
 				product.priceFormula,
 				product.options
 			);
 			if (typeof expression === "string") {
-				errors.name = expression;
+				errors.priceFormula = expression;
 			} else {
-				errors.name = "";
+				errors.priceFormula = "";
 			}
 		}
 	}
@@ -145,6 +145,8 @@
 			if (option.max && option.min && option.max <= option.min)
 				errors.options[option.guid].max = "Max must be greater than min.";
 		}
+
+		validatePriceFormula();
 	}
 
 	function anyInvalidFields(): boolean {
@@ -296,7 +298,7 @@
 							kind="danger-tertiary"
 							icon={TrashCan}
 							size="small"
-							iconDescription="Delete this option."
+							iconDescription="Delete option."
 							class="float-right"
 							on:click={() => deleteOption(option)}
 						/>
@@ -452,7 +454,7 @@
 	>
 		<p>
 			{#if errors.name}
-				Name: {errors.name}<br />
+				Product Name: {errors.name}<br />
 				<br />
 			{/if}
 
@@ -464,22 +466,22 @@
 			{#each product.options as option}
 				{@const optionErrors = errors.options[option.guid] ?? {}}
 				{#if optionErrors.name}
-					{option.name} Name: {optionErrors.name}
+					{option.name || "Option"} Name: {optionErrors.name}
 					<br />
 				{/if}
 
 				{#if optionErrors.values}
-					{option.name} Selectable Values: {optionErrors.values}
+					{option.name || "Option"} Selectable Values: {optionErrors.values}
 					<br />
 				{/if}
 
 				{#if optionErrors.min}
-					{option.name} Min: {optionErrors.min}
+					{option.name || "Option"} Min: {optionErrors.min}
 					<br />
 				{/if}
 
 				{#if optionErrors.max}
-					{option.name} Max: {optionErrors.max}
+					{option.name || "Option"} Max: {optionErrors.max}
 					<br />
 				{/if}
 			{/each}
