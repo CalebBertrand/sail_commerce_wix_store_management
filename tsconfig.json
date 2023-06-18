@@ -2,6 +2,6 @@
   "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
     "module": "esnext",
-    "esModuleInterop": true
+    "allowSyntheticDefaultImports": true
   }
 }

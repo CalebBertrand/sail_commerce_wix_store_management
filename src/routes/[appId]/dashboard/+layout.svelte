@@ -7,6 +7,7 @@
 		HeaderUtilities,
 		HeaderGlobalAction,
 	} from "carbon-components-svelte";
+	import type { CarbonTheme } from "carbon-components-svelte/types/Theme/Theme.svelte";
 	import { Moon, Sun } from "carbon-icons-svelte";
 	import { setContext } from "svelte";
 
@@ -14,7 +15,7 @@
 
 	const darkMode = "g90";
 	const lightMode = "white";
-	let theme = darkMode; // default theme
+	let theme: CarbonTheme = darkMode; // default theme
 </script>
 
 <Theme persist persistKey="sail-commerce-theme" bind:theme />
